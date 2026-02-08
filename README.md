@@ -102,6 +102,8 @@ To contribute:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a pull request
 
+Want to help with translations? See our [Translations Guide](docs/TRANSLATION.md)!
+
 ---
 
 ## 📄 License
