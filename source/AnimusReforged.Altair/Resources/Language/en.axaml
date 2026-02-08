@@ -184,6 +184,8 @@
     <sys:String x:Key="CreditsPage.ReShadePreset.Description">For the ReShade Preset</sys:String>
     <sys:String x:Key="CreditsPage.Background.Title">Claudio</sys:String>
     <sys:String x:Key="CreditsPage.Background.Description">For upscaling background image</sys:String>
+    <sys:String x:Key="CreditsPage.Icon.Title">ArteF4ct</sys:String>
+    <sys:String x:Key="CreditsPage.Icon.Description">For Animus logo used as an icon</sys:String>
 
     <!-- MessageBox Service -->
     <sys:String x:Key="MessageBox.OK">OK</sys:String>

@@ -66,6 +66,14 @@ public partial class CreditsPageViewModel : ViewModelBase
             Description = LocalizationHelper.GetText("CreditsPage.Background.Description"),
             Url = "https://www.nexusmods.com/users/70787823",
             Icon = Symbol.ImageSparkle
+        },
+        
+        new CreditItem
+        {
+            Title = LocalizationHelper.GetText("CreditsPage.Icon.Title"),
+            Description = LocalizationHelper.GetText("CreditsPage.Icon.Description"),
+            Url = "https://www.deviantart.com/artef4ct/art/Animus-Logo-by-ArteF4ct-351074884",
+            Icon = Symbol.Icons
         }
     ];
 
