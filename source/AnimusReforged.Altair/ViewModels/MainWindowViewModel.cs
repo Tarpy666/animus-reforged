@@ -4,11 +4,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading;
+using AnimusReforged.Settings;
+using AnimusReforged.Utilities;
 
 namespace AnimusReforged.Altair.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    [ObservableProperty] private string windowTitle;
     [ObservableProperty] private bool disableWindow;
     [ObservableProperty] private bool hasUpdateNotifications;
     [ObservableProperty] private string updateNotificationMessage;
@@ -18,6 +21,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
+        AltairSettings settings = App.Services.GetRequiredService<AltairSettings>();
+        WindowTitle = string.Format(LocalizationHelper.GetText("MainWindow.Title"), settings.Settings.GetVersion());
         disableWindow = false;
         hasUpdateNotifications = false;
         updateNotificationMessage = string.Empty;

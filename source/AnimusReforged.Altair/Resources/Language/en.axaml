@@ -2,7 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <!-- Main Window -->
-    <sys:String x:Key="MainWindow.Title">Animus Reforged</sys:String>
+    <sys:String x:Key="MainWindow.Title">Animus Reforged v{0}</sys:String>
 
     <!-- Main View -->
     <sys:String x:Key="MainView.Navigation.Play">Play</sys:String>
