@@ -20,8 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/1.png" alt="Welcome Screenshot">
-  <img src="assets/screenshots/2.png" alt="Default Page">
+  <img src="assets/screenshots/1 - Welcome.png" alt="Welcome Screenshot">
 </p>
 
 <p align="center">
