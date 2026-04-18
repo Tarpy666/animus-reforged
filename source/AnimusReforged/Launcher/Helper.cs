@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AnimusReforged.Logging;
+using AnimusReforged.Models.Launcher;
 using AnimusReforged.Utilities;
 
 namespace AnimusReforged.Launcher;
@@ -10,7 +11,7 @@ namespace AnimusReforged.Launcher;
 public class Helper
 {
     /// <summary>
-    /// Launches the uMod process with minimized window style.
+    /// Launches the uMod process with a minimized window style.
     /// </summary>
     /// <returns>The Process object representing the launched uMod instance.</returns>
     public static Process LaunchuMod()
@@ -83,78 +84,42 @@ public class Helper
 
     /// <summary>
     /// Waits synchronously until all known game-related processes have exited.
-    /// Distinguishes between DRM restarts and real exits by measuring how long the
-    /// game ran before exiting. A DRM restart typically exits almost immediately,
-    /// whereas a real game session runs for a meaningful amount of time.
-    /// Once a DRM restart is confirmed, subsequent exits are treated as final immediately.
+    /// Uses a state machine to handle DRM restarts cleanly:
+    /// - Only checks for DRM respawn once, on the first short-lived session
+    /// - Uses short timeouts to minimize delay on quick legitimate closes
+    /// - After DRM is confirmed, the next exit is treated as final immediately
     /// </summary>
     /// <param name="executableNames">The list of executable names to monitor for exit.</param>
-    /// <param name="pollingInterval">How often to check for running processes (defaults to 2 seconds).</param>
-    /// <param name="initialTimeout">How long to wait for the game to appear initially (defaults to 30 seconds).</param>
-    /// <param name="drmThreshold">Maximum runtime to consider an exit as a DRM restart (defaults to 30 seconds).</param>
-    public static void WaitForGameExit(IEnumerable<string> executableNames,
-        TimeSpan? pollingInterval = null, TimeSpan? initialTimeout = null, TimeSpan? drmThreshold = null)
+    /// <param name="options">Configuration options for monitoring behavior. Uses defaults if null.</param>
+    public static void WaitForGameExit(IEnumerable<string> executableNames, GameMonitorOptions? options = null)
     {
-        TimeSpan interval = pollingInterval ?? TimeSpan.FromSeconds(2);
-        TimeSpan timeout = initialTimeout ?? TimeSpan.FromSeconds(30);
-        TimeSpan threshold = drmThreshold ?? TimeSpan.FromSeconds(30);
+        options ??= new GameMonitorOptions();
         string[] names = StripExtensions(executableNames);
-        bool drmRestartConfirmed = false;
+
+        MonitorState state = MonitorState.WaitingForInitialLaunch;
+        Stopwatch sessionTimer = new Stopwatch();
+        Stopwatch waitTimer = new Stopwatch();
 
         Logger.Info<Helper>($"Monitoring game processes: {string.Join(", ", names)}");
+        Logger.Info<Helper>($"Options: polling={options.PollingInterval.TotalMilliseconds}ms, " +
+                            $"initialTimeout={options.InitialLaunchTimeout.TotalSeconds}s, " +
+                            $"drmThreshold={options.DrmThreshold.TotalSeconds}s, " +
+                            $"drmRespawnTimeout={options.DrmRespawnTimeout.TotalSeconds}s");
 
-        // Wait for the game to appear initially
-        if (!WaitForProcessToAppear(names, interval, timeout))
+        waitTimer.Start();
+
+        while (state != MonitorState.Exited)
         {
-            Logger.Warning<Helper>("Game process never appeared within initial timeout");
-            return;
-        }
+            bool isRunning = AreAnyProcessesRunning(names);
 
-        Logger.Info<Helper>("Game process detected");
+            state = ProcessStateTransition(state, isRunning,
+                sessionTimer, waitTimer,
+                options);
 
-        while (true)
-        {
-            // Track how long the game runs this cycle
-            Stopwatch sessionTimer = Stopwatch.StartNew();
-
-            // Wait while the game is running
-            while (AreAnyProcessesRunning(names))
+            if (state != MonitorState.Exited)
             {
-                Thread.Sleep(interval);
+                Thread.Sleep(options.PollingInterval);
             }
-
-            sessionTimer.Stop();
-            TimeSpan sessionDuration = sessionTimer.Elapsed;
-
-            Logger.Info<Helper>($"All game processes exited after {sessionDuration.TotalSeconds:F1}s");
-
-            // If DRM restart was already confirmed, this is the real game exiting — done
-            if (drmRestartConfirmed)
-            {
-                Logger.Info<Helper>("Game exited after DRM restart — treating as final exit");
-                break;
-            }
-
-            // If the game ran longer than the threshold, it was a real session — done
-            if (sessionDuration > threshold)
-            {
-                Logger.Info<Helper>("Session exceeded DRM threshold — treating as final exit");
-                break;
-            }
-
-            // Short session — likely a DRM restart, wait for respawn
-            Logger.Info<Helper>("Short session detected (possible DRM restart) — waiting for game to respawn...");
-
-            if (WaitForProcessToAppear(names, interval, timeout))
-            {
-                Logger.Info<Helper>("Game respawned (DRM restart confirmed) — subsequent exit will be treated as final");
-                drmRestartConfirmed = true;
-                continue;
-            }
-
-            // Game did not respawn despite short session — treat as final exit
-            Logger.Info<Helper>("Game did not respawn within timeout — treating as final exit");
-            break;
         }
 
         Logger.Info<Helper>("All monitored game processes have exited");
@@ -162,83 +127,137 @@ public class Helper
 
     /// <summary>
     /// Waits asynchronously until all known game-related processes have exited.
-    /// Distinguishes between DRM restarts and real exits by measuring how long the
-    /// game ran before exiting. A DRM restart typically exits almost immediately,
-    /// whereas a real game session runs for a meaningful amount of time.
-    /// Once a DRM restart is confirmed, subsequent exits are treated as final immediately.
+    /// Uses a state machine to handle DRM restarts cleanly:
+    /// - Only checks for DRM respawn once, on the first short-lived session
+    /// - Uses short timeouts to minimize delay on quick legitimate closes
+    /// - After DRM is confirmed, the next exit is treated as final immediately
     /// </summary>
     /// <param name="executableNames">The list of executable names to monitor for exit.</param>
-    /// <param name="pollingInterval">How often to check for running processes (defaults to 2 seconds).</param>
-    /// <param name="initialTimeout">How long to wait for the game to appear initially (defaults to 30 seconds).</param>
-    /// <param name="drmThreshold">Maximum runtime to consider an exit as a DRM restart (defaults to 30 seconds).</param>
+    /// <param name="options">Configuration options for monitoring behavior. Uses defaults if null.</param>
     /// <param name="cancellationToken">Token to cancel the wait operation.</param>
     public static async Task WaitForGameExitAsync(IEnumerable<string> executableNames,
-        TimeSpan? pollingInterval = null, TimeSpan? initialTimeout = null, TimeSpan? drmThreshold = null,
+        GameMonitorOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        TimeSpan interval = pollingInterval ?? TimeSpan.FromSeconds(2);
-        TimeSpan timeout = initialTimeout ?? TimeSpan.FromSeconds(30);
-        TimeSpan threshold = drmThreshold ?? TimeSpan.FromSeconds(30);
+        options ??= new GameMonitorOptions();
         string[] names = StripExtensions(executableNames);
-        bool drmRestartConfirmed = false;
+
+        MonitorState state = MonitorState.WaitingForInitialLaunch;
+        Stopwatch sessionTimer = new Stopwatch();
+        Stopwatch waitTimer = new Stopwatch();
 
         Logger.Info<Helper>($"Monitoring game processes: {string.Join(", ", names)}");
+        Logger.Info<Helper>($"Options: polling={options.PollingInterval.TotalMilliseconds}ms, " +
+                            $"initialTimeout={options.InitialLaunchTimeout.TotalSeconds}s, " +
+                            $"drmThreshold={options.DrmThreshold.TotalSeconds}s, " +
+                            $"drmRespawnTimeout={options.DrmRespawnTimeout.TotalSeconds}s");
 
-        // Wait for the game to appear initially
-        if (!await WaitForProcessToAppearAsync(names, interval, timeout, cancellationToken))
+        waitTimer.Start();
+
+        while (state != MonitorState.Exited)
         {
-            Logger.Warning<Helper>("Game process never appeared within initial timeout");
-            return;
-        }
+            bool isRunning = AreAnyProcessesRunning(names);
 
-        Logger.Info<Helper>("Game process detected");
+            state = ProcessStateTransition(state, isRunning,
+                sessionTimer, waitTimer,
+                options);
 
-        while (true)
-        {
-            // Track how long the game runs this cycle
-            Stopwatch sessionTimer = Stopwatch.StartNew();
-
-            // Wait while the game is running
-            while (AreAnyProcessesRunning(names))
+            if (state != MonitorState.Exited)
             {
-                await Task.Delay(interval, cancellationToken);
+                await Task.Delay(options.PollingInterval, cancellationToken);
             }
-
-            sessionTimer.Stop();
-            TimeSpan sessionDuration = sessionTimer.Elapsed;
-
-            Logger.Info<Helper>($"All game processes exited after {sessionDuration.TotalSeconds:F1}s");
-
-            // If DRM restart was already confirmed, this is the real game exiting — done
-            if (drmRestartConfirmed)
-            {
-                Logger.Info<Helper>("Game exited after DRM restart — treating as final exit");
-                break;
-            }
-
-            // If the game ran longer than the threshold, it was a real session — done
-            if (sessionDuration > threshold)
-            {
-                Logger.Info<Helper>("Session exceeded DRM threshold — treating as final exit");
-                break;
-            }
-
-            // Short session — likely a DRM restart, wait for respawn
-            Logger.Info<Helper>("Short session detected (possible DRM restart) — waiting for game to respawn...");
-
-            if (await WaitForProcessToAppearAsync(names, interval, timeout, cancellationToken))
-            {
-                Logger.Info<Helper>("Game respawned (DRM restart confirmed) — subsequent exit will be treated as final");
-                drmRestartConfirmed = true;
-                continue;
-            }
-
-            // Game did not respawn despite short session — treat as final exit
-            Logger.Info<Helper>("Game did not respawn within timeout — treating as final exit");
-            break;
         }
 
         Logger.Info<Helper>("All monitored game processes have exited");
+    }
+
+    /// <summary>
+    /// Processes a single state transition in the game monitoring state machine.
+    /// </summary>
+    /// <param name="currentState">The current state of the monitor.</param>
+    /// <param name="isRunning">Whether any monitored game process is currently running.</param>
+    /// <param name="sessionTimer">Stopwatch tracking how long the current game session has been running.</param>
+    /// <param name="waitTimer">Stopwatch tracking how long we've been waiting in timeout states.</param>
+    /// <param name="options">Configuration options for monitoring behavior.</param>
+    /// <returns>The new state after processing the transition.</returns>
+    private static MonitorState ProcessStateTransition(MonitorState currentState, bool isRunning,
+        Stopwatch sessionTimer, Stopwatch waitTimer,
+        GameMonitorOptions options)
+    {
+        switch (currentState)
+        {
+            case MonitorState.WaitingForInitialLaunch:
+                if (isRunning)
+                {
+                    Logger.Info<Helper>("Game process detected");
+                    sessionTimer.Restart();
+                    return MonitorState.GameRunning;
+                }
+
+                if (waitTimer.Elapsed >= options.InitialLaunchTimeout)
+                {
+                    Logger.Warning<Helper>("Game process never appeared within initial timeout");
+                    return MonitorState.Exited;
+                }
+
+                return MonitorState.WaitingForInitialLaunch;
+
+            case MonitorState.GameRunning:
+                if (isRunning)
+                {
+                    return MonitorState.GameRunning;
+                }
+
+                sessionTimer.Stop();
+                TimeSpan sessionDuration = sessionTimer.Elapsed;
+                Logger.Info<Helper>($"Game exited after {sessionDuration.TotalSeconds:F1}s");
+
+                // Long session — definitely a real exit
+                if (sessionDuration > options.DrmThreshold)
+                {
+                    Logger.Info<Helper>("Session exceeded DRM threshold — treating as final exit");
+                    return MonitorState.Exited;
+                }
+
+                // Short session — might be DRM, wait briefly for respawn
+                Logger.Info<Helper>($"Short session ({sessionDuration.TotalSeconds:F1}s) — " +
+                                    $"waiting up to {options.DrmRespawnTimeout.TotalSeconds}s for possible DRM respawn...");
+                waitTimer.Restart();
+                return MonitorState.WaitingForDrmRespawn;
+
+            case MonitorState.WaitingForDrmRespawn:
+                if (isRunning)
+                {
+                    Logger.Info<Helper>("Game respawned — DRM restart confirmed, now monitoring real session");
+                    sessionTimer.Restart();
+                    return MonitorState.MonitoringAfterDrmRestart;
+                }
+
+                if (waitTimer.Elapsed >= options.DrmRespawnTimeout)
+                {
+                    Logger.Info<Helper>("No respawn detected within timeout — treating as final exit");
+                    return MonitorState.Exited;
+                }
+
+                return MonitorState.WaitingForDrmRespawn;
+
+            case MonitorState.MonitoringAfterDrmRestart:
+                if (isRunning)
+                {
+                    return MonitorState.MonitoringAfterDrmRestart;
+                }
+
+                sessionTimer.Stop();
+                Logger.Info<Helper>($"Game exited after {sessionTimer.Elapsed.TotalSeconds:F1}s (post-DRM session) — treating as final exit");
+                return MonitorState.Exited;
+
+            case MonitorState.Exited:
+                return MonitorState.Exited;
+
+            default:
+                Logger.Error<Helper>($"Unknown state: {currentState}");
+                return MonitorState.Exited;
+        }
     }
 
     /// <summary>
@@ -255,66 +274,13 @@ public class Helper
             {
                 continue;
             }
+
             foreach (Process process in processes)
             {
                 process.Dispose();
             }
 
             return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Waits synchronously for any of the specified game processes to appear within the given timeout.
-    /// Used to detect game spawns after DRM restarts or initial launch delays.
-    /// </summary>
-    /// <param name="processNames">The process names to watch for (without .exe extension).</param>
-    /// <param name="pollingInterval">How often to check for the process.</param>
-    /// <param name="timeout">Maximum time to wait for the process to appear.</param>
-    /// <returns>True if a process appeared within the timeout, false otherwise.</returns>
-    private static bool WaitForProcessToAppear(string[] processNames,
-        TimeSpan pollingInterval, TimeSpan timeout)
-    {
-        Stopwatch stopwatch = Stopwatch.StartNew();
-
-        while (stopwatch.Elapsed < timeout)
-        {
-            if (AreAnyProcessesRunning(processNames))
-            {
-                return true;
-            }
-
-            Thread.Sleep(pollingInterval);
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Waits asynchronously for any of the specified game processes to appear within the given timeout.
-    /// Used to detect game spawns after DRM restarts or initial launch delays.
-    /// </summary>
-    /// <param name="processNames">The process names to watch for (without .exe extension).</param>
-    /// <param name="pollingInterval">How often to check for the process.</param>
-    /// <param name="timeout">Maximum time to wait for the process to appear.</param>
-    /// <param name="cancellationToken">Token to cancel the wait operation.</param>
-    /// <returns>True if a process appeared within the timeout, false otherwise.</returns>
-    private static async Task<bool> WaitForProcessToAppearAsync(string[] processNames,
-        TimeSpan pollingInterval, TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        Stopwatch stopwatch = Stopwatch.StartNew();
-
-        while (stopwatch.Elapsed < timeout)
-        {
-            if (AreAnyProcessesRunning(processNames))
-            {
-                return true;
-            }
-
-            await Task.Delay(pollingInterval, cancellationToken);
         }
 
         return false;
