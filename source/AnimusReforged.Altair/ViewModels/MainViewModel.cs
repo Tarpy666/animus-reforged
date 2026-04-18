@@ -26,8 +26,8 @@ public partial class MainViewModel : ViewModelBase
         if (!File.Exists(FilePaths.AltairExecutables[ExecutableType.DX9]))
         {
             Logger.Error<MainViewModel>("Missing game executable");
-            await _messageBoxService.ShowErrorAsync(LocalizationHelper.GetText("MainView.MissingExecutableTitle"),
-                string.Format(LocalizationHelper.GetText("MainView.MissingExecutableText"), FilePaths.AltairExecutables[ExecutableType.DX9]));
+            await _messageBoxService.ShowErrorAsync(LocalizationHelper.GetText("MainView.MissingExecutable.Title"),
+                string.Format(LocalizationHelper.GetText("MainView.MissingExecutable.Text"), FilePaths.AltairExecutables[ExecutableType.DX9]));
             Environment.Exit(0);
         }
     }

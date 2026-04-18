@@ -10,8 +10,8 @@
     <sys:String x:Key="MainView.Navigation.Manage">Manage</sys:String>
     <sys:String x:Key="MainView.Navigation.Credits">Credits</sys:String>
     <sys:String x:Key="MainView.Navigation.Donate">Donate</sys:String>
-    <sys:String x:Key="MainView.MessageBox.MissingExecutableTitle">Game executable not found.</sys:String>
-    <sys:String x:Key="MainView.MessageBox.MissingExecutableText">Please make sure you have the game installed and the executable is in the game folder next to the {0}.</sys:String>
+    <sys:String x:Key="MainView.MissingExecutable.Title">Game executable not found.</sys:String>
+    <sys:String x:Key="MainView.MissingExecutable.Text">Please make sure you have the game installed and the executable is in the game folder next to the {0}.</sys:String>
 
     <!-- Welcome Page -->
     <sys:String x:Key="WelcomePage.Header.Title">Welcome to Animus Reforged</sys:String>
