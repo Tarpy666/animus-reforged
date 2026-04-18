@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using AnimusReforged.Altair.Services.UI;
 using AnimusReforged.Logging;
+using AnimusReforged.Models.Altair;
 using AnimusReforged.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,11 +23,11 @@ public partial class MainViewModel : ViewModelBase
     public async Task CheckInstallation()
     {
         Logger.Info<MainViewModel>("Checking if the AnimusReforged has been placed next to the game executable");
-        if (!File.Exists(FilePaths.AltairExecutable))
+        if (!File.Exists(FilePaths.AltairExecutables[ExecutableType.DX9]))
         {
             Logger.Error<MainViewModel>("Missing game executable");
             await _messageBoxService.ShowErrorAsync(LocalizationHelper.GetText("MainView.MissingExecutableTitle"),
-                string.Format(LocalizationHelper.GetText("MainView.MissingExecutableText"), FilePaths.AltairExecutable));
+                string.Format(LocalizationHelper.GetText("MainView.MissingExecutableText"), FilePaths.AltairExecutables[ExecutableType.DX9]));
             Environment.Exit(0);
         }
     }

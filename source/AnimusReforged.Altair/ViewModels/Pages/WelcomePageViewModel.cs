@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using AnimusReforged.Altair.Services.UI;
 using AnimusReforged.Logging;
+using AnimusReforged.Models.Altair;
 using AnimusReforged.Mods.Altair;
 using AnimusReforged.Mods.Core;
 using AnimusReforged.Settings;
@@ -126,8 +127,15 @@ public partial class WelcomePageViewModel : ViewModelBase
             // Applying 4GB Patch (Large Address Aware)
             StatusText = LocalizationHelper.GetText("WelcomePage.Status.Applying4gbPatch");
             Logger.Info<WelcomePageViewModel>("Applying 4GB Patch (Large Address Aware) to AssassinsCreed_Dx9.exe");
-            Patcher.LargeAddressAwarePatch(FilePaths.AltairExecutable);
+            Patcher.LargeAddressAwarePatch(FilePaths.AltairExecutables[ExecutableType.DX9]);
             Logger.Info<WelcomePageViewModel>("4GB Patch applied successfully");
+
+            // Replace DX10 executable with patched DX9 executable
+            if (File.Exists(FilePaths.AltairExecutables[ExecutableType.DX10]))
+            {
+                Patcher.CreateBackup(FilePaths.AltairExecutables[ExecutableType.DX10]);
+            }
+            File.Copy(FilePaths.AltairExecutables[ExecutableType.DX9], FilePaths.AltairExecutables[ExecutableType.DX10], true);
 
             // Delete the downloads directory recursively
             if (Directory.Exists(FilePaths.DownloadsDirectory))

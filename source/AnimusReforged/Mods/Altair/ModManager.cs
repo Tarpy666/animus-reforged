@@ -243,7 +243,7 @@ public class ModManager
         else
         {
             Logger.Info<ModManager>("Deleting game entry from uMod config file");
-            await UModManager.RemoveGameFromAppdata(FilePaths.AltairExecutable);
+            await UModManager.RemoveGameFromAppdata(FilePaths.AltairExecutables.Values.ToList());
         }
     }
 
@@ -278,9 +278,9 @@ public class ModManager
     /// <returns>A task representing the asynchronous setup operation</returns>
     public static async Task SetupUMod()
     {
-        await UModManager.SetupAppdata(FilePaths.AltairExecutable);
+        await UModManager.SetupAppdata(FilePaths.AltairExecutables.Values.ToList());
         string[] uModMods = [FilePaths.OverhaulTpfFile];
-        await UModManager.SetupSaveFile(FilePaths.AltairExecutable, "ac1.txt", uModMods);
+        await UModManager.SetupSaveFile(FilePaths.AltairExecutables.Values.ToList(), "ac1.txt", uModMods);
     }
 
     #endregion

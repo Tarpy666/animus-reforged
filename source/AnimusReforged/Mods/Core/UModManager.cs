@@ -13,27 +13,36 @@ public class UModManager
     private static readonly UnicodeEncoding UnicodeNoBom = new UnicodeEncoding(bigEndian: false, byteOrderMark: false);
 
     /// <summary>
-    /// Sets up the uMod AppData directory and config file with the specified game path.
+    /// Sets up the uMod AppData directory and config file with the specified game paths.
     /// </summary>
-    /// <param name="gamePath">The path to the game executable or directory.</param>
+    /// <param name="gamePaths">The paths to the game executables or directories.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
-    /// <exception cref="ArgumentException">Thrown when gamePath is null or empty.</exception>
-    public static async Task SetupAppdata(string gamePath, CancellationToken cancellationToken = default)
+    /// <exception cref="ArgumentException">Thrown when gamePaths is null or empty.</exception>
+    public static async Task SetupAppdata(IReadOnlyList<string> gamePaths, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(gamePath);
+        ArgumentNullException.ThrowIfNull(gamePaths);
+        if (gamePaths.Count == 0)
+        {
+            // Shouldn't ever happen
+            throw new ArgumentException("Game paths cannot be empty.", nameof(gamePaths));
+        }
 
         Logger.Debug<UModManager>("Setting up uMod AppData");
         Directory.CreateDirectory(FilePaths.UModAppdata);
-        Logger.Debug<UModManager>($"Game path: {gamePath}");
 
-        if (File.Exists(FilePaths.UModConfig))
+        foreach (string gamePath in gamePaths)
         {
-            await AppendGamePathIfMissing(gamePath, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            Logger.Debug<UModManager>("Creating new uMod AppData config file");
-            await File.WriteAllTextAsync(FilePaths.UModConfig, gamePath, UnicodeNoBom, cancellationToken).ConfigureAwait(false);
+            Logger.Debug<UModManager>($"Game path: {gamePath}");
+
+            if (File.Exists(FilePaths.UModConfig))
+            {
+                await AppendGamePathIfMissing(gamePath, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                Logger.Debug<UModManager>("Creating new uMod AppData config file");
+                await File.WriteAllTextAsync(FilePaths.UModConfig, gamePath, UnicodeNoBom, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
@@ -67,14 +76,18 @@ public class UModManager
     }
 
     /// <summary>
-    /// Removes the specified game path from the uMod config file.
+    /// Removes the specified game paths from the uMod config file.
     /// </summary>
-    /// <param name="gamePath">The path to remove from the config file.</param>
+    /// <param name="gamePaths">The paths to remove from the config file.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
-    /// <exception cref="ArgumentException">Thrown when gamePath is null or empty.</exception>
-    public static async Task RemoveGameFromAppdata(string gamePath, CancellationToken cancellationToken = default)
+    /// <exception cref="ArgumentException">Thrown when gamePaths is null or empty.</exception>
+    public static async Task RemoveGameFromAppdata(IReadOnlyList<string> gamePaths, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(gamePath);
+        ArgumentNullException.ThrowIfNull(gamePaths);
+        if (gamePaths.Count == 0)
+        {
+            throw new ArgumentException("Game paths cannot be empty.", nameof(gamePaths));
+        }
 
         if (!File.Exists(FilePaths.UModConfig))
         {
@@ -84,33 +97,38 @@ public class UModManager
 
         string[] lines = await File.ReadAllLinesAsync(FilePaths.UModConfig, UnicodeNoBom, cancellationToken).ConfigureAwait(false);
 
-        // Filter out matching lines
+        // Filter out any lines matching any of the provided paths
         string[] updatedLines = lines
-            .Where(line => !line.Trim().Equals(gamePath, StringComparison.OrdinalIgnoreCase))
+            .Where(line => !gamePaths.Any(path => line.Trim().Equals(path, StringComparison.OrdinalIgnoreCase)))
             .ToArray();
 
         if (updatedLines.Length < lines.Length)
         {
             await File.WriteAllLinesAsync(FilePaths.UModConfig, updatedLines, UnicodeNoBom, cancellationToken).ConfigureAwait(false);
-            Logger.Debug<UModManager>($"Removed '{gamePath}' from uMod config");
+            Logger.Debug<UModManager>($"Removed {lines.Length - updatedLines.Length} path(s) from uMod config");
         }
         else
         {
-            Logger.Warning<UModManager>($"'{gamePath}' not found in config file");
+            Logger.Warning<UModManager>("None of the provided paths were found in config file");
         }
     }
 
     /// <summary>
     /// Sets up the uMod save file and template for the specified game.
     /// </summary>
-    /// <param name="gamePath">The path to the game executable or directory.</param>
+    /// <param name="gamePaths">The paths to the game executables or directories.</param>
     /// <param name="templateName">The name of the template file to create.</param>
     /// <param name="modFilePaths">Collection of mod file paths to include in the template as enabled mods.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
-    /// <exception cref="ArgumentException">Thrown when gamePath or templateName is null or empty.</exception>
-    public static async Task SetupSaveFile(string gamePath, string templateName, IEnumerable<string>? modFilePaths = null, CancellationToken cancellationToken = default)
+    /// <exception cref="ArgumentException">Thrown when gamePaths is null/empty or templateName is null or empty.</exception>
+    public static async Task SetupSaveFile(IReadOnlyList<string> gamePaths, string templateName, IEnumerable<string>? modFilePaths = null, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(gamePath);
+        ArgumentNullException.ThrowIfNull(gamePaths);
+        if (gamePaths.Count == 0)
+        {
+            // This shouldn't happen
+            throw new ArgumentException("Game paths cannot be empty.", nameof(gamePaths));
+        }
         ArgumentException.ThrowIfNullOrWhiteSpace(templateName);
 
         Directory.CreateDirectory(FilePaths.UModTemplates);
@@ -125,14 +143,15 @@ public class UModManager
         Logger.Debug<UModManager>("Setting up uMod template");
         string templatePath = Path.Combine(FilePaths.UModTemplates, templateName);
 
-        // Build template content
+        // Build template content (only needs to be done once)
         string content = BuildTemplateContent(modFilePaths);
         await File.WriteAllTextAsync(templatePath, content, Utf8NoBom, cancellationToken).ConfigureAwait(false);
 
-        // Append to save files
-        string saveFileEntry = $"{gamePath}|{templatePath}\n";
-        Logger.Debug<UModManager>($"Save file entry: {saveFileEntry}");
-        await File.AppendAllTextAsync(FilePaths.UModSaveFiles, saveFileEntry, UnicodeNoBom, cancellationToken).ConfigureAwait(false);
+        // Append all game paths to save files
+        IEnumerable<string> saveFileEntries = gamePaths.Select(gamePath => $"{gamePath}|{templatePath}\n");
+        string saveFileContent = string.Concat(saveFileEntries);
+        Logger.Debug<UModManager>($"Save file entries:\n{saveFileContent}");
+        await File.AppendAllTextAsync(FilePaths.UModSaveFiles, saveFileContent, UnicodeNoBom, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

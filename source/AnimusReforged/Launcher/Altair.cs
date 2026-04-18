@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AnimusReforged.Logging;
+using AnimusReforged.Models.Altair;
 using AnimusReforged.Utilities;
 
 namespace AnimusReforged.Launcher;
@@ -42,7 +43,7 @@ public class Altair
             }
 
             Logger.Info<Altair>("Launching the game");
-            game = Helper.LaunchGame(FilePaths.AltairExecutable);
+            game = Helper.LaunchGame(FilePaths.AltairExecutables[ExecutableType.DX9]);
 
             Logger.Info<Altair>("Waiting for the game to exit");
             await Helper.WaitForGameExitAsync(GameExecutables, cancellationToken: cancellationToken);
@@ -83,7 +84,7 @@ public class Altair
             }
 
             Logger.Info<Altair>("Launching the game");
-            game = Helper.LaunchGame(FilePaths.AltairExecutable);
+            game = Helper.LaunchGame(FilePaths.AltairExecutables[ExecutableType.DX9]);
 
             Logger.Info<Altair>("Waiting for the game to exit");
             Helper.WaitForGameExit(GameExecutables);

@@ -28,10 +28,10 @@ public abstract class Patcher
         }
 
         string? directory = Path.GetDirectoryName(filePath);
-        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+        string fileName = Path.GetFileName(filePath);
         string originalExtension = Path.GetExtension(filePath);
 
-        string backupFileName = $"{fileNameWithoutExtension}.bak";
+        string backupFileName = $"{fileName}.bak";
         string backupPath = Path.Combine(directory ?? "", backupFileName);
 
         Logger.Info<Patcher>($"Creating backup of '{filePath}' to '{backupPath}'");

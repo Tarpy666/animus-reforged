@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using AnimusReforged.Altair.Services;
 using AnimusReforged.Models;
 using AnimusReforged.Altair.Services.UI;
 using AnimusReforged.Logging;
+using AnimusReforged.Models.Altair;
 using AnimusReforged.Mods.Altair;
 using AnimusReforged.Mods.Core;
 using AnimusReforged.Models.Mods;
@@ -290,7 +292,7 @@ public partial class ManagePageViewModel : ViewModelBase
         Logger.Info<ManagePageViewModel>("Redoing uMod paths");
         try
         {
-            await UModManager.SetupAppdata(FilePaths.AltairExecutable);
+            await UModManager.SetupAppdata(FilePaths.AltairExecutables.Values.ToList());
         }
         catch (ArgumentException)
         {
@@ -301,7 +303,7 @@ public partial class ManagePageViewModel : ViewModelBase
         }
         try
         {
-            await UModManager.SetupSaveFile(FilePaths.AltairExecutable, "ac1.txt");
+            await UModManager.SetupSaveFile(FilePaths.AltairExecutables.Values.ToList(), "ac1.txt");
         }
         catch (ArgumentException)
         {
@@ -362,14 +364,27 @@ public partial class ManagePageViewModel : ViewModelBase
             return;
         }
 
-        // Restore original executable
+        // Restore original executables
         try
         {
-            if (File.Exists(FilePaths.AltairExecutable + ".bak"))
+            // Restore DX9 executable
+            if (File.Exists(FilePaths.AltairExecutables[ExecutableType.DX9] + ".bak"))
             {
                 Logger.Info<ManagePageViewModel>("Restoring the original game executable without LAA patch applied");
-                File.Copy(FilePaths.AltairExecutable + ".bak", FilePaths.AltairExecutable, true);
-                File.Delete(FilePaths.AltairExecutable + ".bak");
+                File.Copy(FilePaths.AltairExecutables[ExecutableType.DX9] + ".bak", FilePaths.AltairExecutables[ExecutableType.DX9], true);
+                File.Delete(FilePaths.AltairExecutables[ExecutableType.DX9] + ".bak");
+            }
+            else
+            {
+                Logger.Warning<ManagePageViewModel>("Couldn't find backup of the original game executable");
+            }
+
+            // Restore DX10 executable
+            if (File.Exists(FilePaths.AltairExecutables[ExecutableType.DX10] + ".bak"))
+            {
+                Logger.Info<ManagePageViewModel>("Restoring the original game executable without LAA patch applied");
+                File.Copy(FilePaths.AltairExecutables[ExecutableType.DX10] + ".bak", FilePaths.AltairExecutables[ExecutableType.DX10], true);
+                File.Delete(FilePaths.AltairExecutables[ExecutableType.DX10] + ".bak");
             }
             else
             {
