@@ -11,11 +11,24 @@ namespace AnimusReforged.Launcher;
 public class Altair
 {
     /// <summary>
+    /// The known executable names associated with the Assassin's Creed (Altair) game.
+    /// These are monitored to determine when the game has fully exited.
+    /// </summary>
+    private static readonly string[] GameExecutables =
+    [
+        "AssassinsCreed_Dx9.exe",
+        "AssassinsCreed_Dx10.exe",
+        "AssassinsCreed_Game.exe"
+    ];
+
+    /// <summary>
     /// Launches the Assassin's Creed game asynchronously with optional uMod support.
-    /// Waits for the game process to exit before closing uMod if enabled.
+    /// Dynamically handles DRM restarts and waits for the game to fully exit before
+    /// closing uMod if enabled.
     /// </summary>
     /// <param name="uModEnabled">Whether to launch uMod alongside the game (defaults to false).</param>
-    public static async Task LaunchAsync(bool uModEnabled = false)
+    /// <param name="cancellationToken">Token to cancel the wait operation.</param>
+    public static async Task LaunchAsync(bool uModEnabled = false, CancellationToken cancellationToken = default)
     {
         Process? uMod = null;
         Process? game = null;
@@ -32,7 +45,7 @@ public class Altair
             game = Helper.LaunchGame(FilePaths.AltairExecutable);
 
             Logger.Info<Altair>("Waiting for the game to exit");
-            await game.WaitForExitAsync();
+            await Helper.WaitForGameExitAsync(GameExecutables, cancellationToken: cancellationToken);
             Logger.Info<Altair>("Game exited");
         }
         finally
@@ -52,7 +65,8 @@ public class Altair
 
     /// <summary>
     /// Launches the Assassin's Creed game synchronously with optional uMod support.
-    /// Blocks the calling thread until the game process exits before closing uMod if enabled.
+    /// Dynamically handles DRM restarts and blocks the calling thread until the game
+    /// has fully exited before closing uMod if enabled.
     /// </summary>
     /// <param name="uModEnabled">Whether to launch uMod alongside the game (defaults to false).</param>
     public static void Launch(bool uModEnabled = false)
@@ -72,7 +86,7 @@ public class Altair
             game = Helper.LaunchGame(FilePaths.AltairExecutable);
 
             Logger.Info<Altair>("Waiting for the game to exit");
-            game.WaitForExit();
+            Helper.WaitForGameExit(GameExecutables);
             Logger.Info<Altair>("Game exited");
         }
         finally
