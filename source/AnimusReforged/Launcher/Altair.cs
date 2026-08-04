@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AnimusReforged.Bridge;
 using AnimusReforged.Logging;
 using AnimusReforged.Models.Altair;
 using AnimusReforged.Utilities;
@@ -44,10 +45,12 @@ public class Altair
 
             Logger.Info<Altair>("Launching the game");
             game = Helper.LaunchGame(FilePaths.AltairExecutables[ExecutableType.DX9]);
+            BridgeServer.ReportGameState(true, game.ProcessName);
 
             Logger.Info<Altair>("Waiting for the game to exit");
             await Helper.WaitForGameExitAsync(GameExecutables, cancellationToken: cancellationToken);
             Logger.Info<Altair>("Game exited");
+            BridgeServer.ReportGameState(false);
         }
         finally
         {
@@ -85,10 +88,12 @@ public class Altair
 
             Logger.Info<Altair>("Launching the game");
             game = Helper.LaunchGame(FilePaths.AltairExecutables[ExecutableType.DX9]);
+            BridgeServer.ReportGameState(true, game.ProcessName);
 
             Logger.Info<Altair>("Waiting for the game to exit");
             Helper.WaitForGameExit(GameExecutables);
             Logger.Info<Altair>("Game exited");
+            BridgeServer.ReportGameState(false);
         }
         finally
         {
