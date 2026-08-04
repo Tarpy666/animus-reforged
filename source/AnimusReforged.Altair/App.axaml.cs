@@ -8,6 +8,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using AnimusReforged.Altair.Views;
+using AnimusReforged.Bridge;
 using AnimusReforged.Logging;
 using AnimusReforged.Settings;
 using AnimusReforged.Utilities;
@@ -96,6 +97,8 @@ public partial class App : Application
             desktop.Exit += (_, _) =>
             {
                 Logger.Info<App>("Closing AnimusReforged Altair");
+                Logger.Debug<App>("Stopping l1l-@p3p bridge");
+                BridgeServer.Instance?.Stop();
                 Logger.Debug<App>("Shutting down logger");
                 Logger.Shutdown();
             };
@@ -134,6 +137,10 @@ public partial class App : Application
 
             Logger.Debug<App>("Setting main window");
             desktop.MainWindow = mainWindow;
+
+            // Start the l1l-@p3p bridge so the overlay can talk to the launcher/game
+            Logger.Info<App>("Starting l1l-@p3p bridge");
+            BridgeServer.StartDefault();
 
             Logger.Info<App>("Application initialization completed successfully");
 
